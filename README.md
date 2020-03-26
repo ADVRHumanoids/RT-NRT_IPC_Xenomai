@@ -139,7 +139,7 @@ run sudo /usr/xenomai/sbin/autotune
 xeno latency
 ```
 
-![latency](https://github.com/ADVRHumanoids/XBotBlock/blob/master/cmakeBlockFactory3.png)
+![latency](https://github.com/ADVRHumanoids/RT-NRT_IPC_Xenomai/blob/master/doc/img/latency.png)
 
 Tip
 

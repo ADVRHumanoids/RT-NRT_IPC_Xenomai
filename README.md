@@ -129,8 +129,8 @@ source ~/.bashrc
 ## RUN (every boot of xenomai kernel)
 
 ```
-run sudo chgrp xenomai /dev/rtp* && sudo chmod g+rw /dev/rtp* [OGNI BOOT]
-run sudo /usr/xenomai/sbin/autotune after every boot improves the latency a lot.
+run sudo chgrp xenomai /dev/rtp* && sudo chmod g+rw /dev/rtp*
+run sudo /usr/xenomai/sbin/autotune
 ```
 
 ## Test your installation
@@ -139,7 +139,7 @@ run sudo /usr/xenomai/sbin/autotune after every boot improves the latency a lot.
 xeno latency
 ```
 
-
+![latency](https://github.com/ADVRHumanoids/XBotBlock/blob/master/cmakeBlockFactory3.png)
 
 Tip
 

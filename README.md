@@ -93,6 +93,12 @@ GRUB_CMDLINE_LINUX_DEFAULT="quiet splash noapic xenomai.allowed_group=1234"
 
 ```
 
+Remember to update grub:
+
+```
+sudo update-grub
+```
+
 Then:
 
 ```
@@ -126,11 +132,13 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$XENOMAI_PATH/lib
 echo 'source ~/.xenomai_rc' >> ~/.bashrc
 source ~/.bashrc
 ```
-## RUN (every boot of xenomai kernel)
+## Run (every boot of xenomai kernel)
+
+Run:
 
 ```
-run sudo chgrp xenomai /dev/rtp* && sudo chmod g+rw /dev/rtp*
-run sudo /usr/xenomai/sbin/autotune
+sudo chgrp xenomai /dev/rtp* && sudo chmod g+rw /dev/rtp*
+sudo /usr/xenomai/sbin/autotune
 ```
 
 ## Test your installation

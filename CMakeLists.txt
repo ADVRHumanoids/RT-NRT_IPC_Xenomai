@@ -36,8 +36,10 @@ add_executable(soc_server src/ipc/socket-server.c)
 
 
 if(${ENABLE_XENO})
-    add_executable(xddp_label src/RTipc/xddp_label.c)
-    add_executable(iddp_label src/RTipc/iddp_label.c)
+    add_executable(xddp_label       src/RTipc/xddp_label.c)
+    add_executable(iddp_label       src/RTipc/iddp_label.c)
+    add_executable(xbotcore_flow    src/RTipc/xbotcore_flow.c)
     set_xeno_flags(xddp_label)
     set_xeno_flags(iddp_label)
+    set_xeno_flags(xbotcore_flow)
 endif()

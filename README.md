@@ -93,6 +93,12 @@ GRUB_CMDLINE_LINUX_DEFAULT="quiet splash noapic xenomai.allowed_group=1234"
 
 ```
 
+Remember to update grub:
+
+```
+sudo update-grub
+```
+
 Then:
 
 ```

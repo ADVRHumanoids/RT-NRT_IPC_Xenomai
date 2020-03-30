@@ -4,14 +4,20 @@ cmake_minimum_required(VERSION 3.0)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Xenomai QUIET)
+find_package(Eigen3 REQUIRED)
 
 option(ENABLE_XENO FALSE)
+
 
 add_executable(unnamed_pipe src/ipc/unnamed_pipe.c)
 
 add_executable(fifo_reader src/ipc/fifo_reader.c)
 
 add_executable(fifo_writer src/ipc/fifo_writer.c)
+
+add_executable(message_queue_reader src/ipc/message_queue_reader.c)
+
+add_executable(message_queue_writer src/ipc/message_queue_writer.c)
 
 add_executable(posix-shm-server src/ipc/posix-shm-server.c)
 target_link_libraries(posix-shm-server rt)

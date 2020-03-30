@@ -13,11 +13,43 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <semaphore.h>
+
+
+#define SHMOBJ_PATH  "/shm_XBOT"
+#define SEM_PATH     "/sem_XBOT"
 #define XDDP_PORT_LABEL  "xddp-demo"
+#define N_JOINT 10
+
 pthread_t svtid, cltid,nrt;
 
 
-static const char *msg[]={""};
+struct shared_data 
+{
+    
+    double q[N_JOINT];
+};
+
+
+static void set_signal_handler ( __sighandler_t sig_handler ) {
+    signal ( SIGINT, sig_handler );
+    signal ( SIGKILL, sig_handler );
+}
+
+void main_common ( __sighandler_t sig_handler ) {
+    int ret;
+
+    set_signal_handler ( sig_handler );
+    
+    return;
+}
+static int main_loop = 1;
+
+
+void shutdownSIG(int sig __attribute__((unused)))
+{
+    main_loop = 0;
+}
 
 static void fail(const char *reason)
 {
@@ -26,102 +58,106 @@ static void fail(const char *reason)
 }
 static void *HAL(void *arg)
 {
-    const char * shm_name  = "/AOS";
-    const int SIZE = 4096;
-    const char * message[] = {"This ","is ","about ","shared ","memory"};
-    int i, shm_fd;
-    void * ptr;
+    int shared_seg_size = (1 * sizeof(struct shared_data));
+   
     
-    // ******** shm_open() ***************////// 
-    //   shm_open()- opening/creation of a shared memory segment referenced by a name
-    //        1) A special file will appear in the file-system under “/dev/shm/” with the provided name.
-    //        2) The special file represents a POSIX object and it is created for persistence 
-    //        3) ftruncate(...) function resize to memory region to the correct size
+    int shmfd  = shm_open(SHMOBJ_PATH, O_CREAT | O_RDWR, S_IRWXU | S_IRWXG);
+    ftruncate(shmfd, shared_seg_size);
+    struct shared_data * shared_msg = (struct shared_data *)mmap(NULL, shared_seg_size, PROT_READ | PROT_WRITE, MAP_SHARED,shmfd, 0);
     
-    shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+    struct timespec ts;
+    struct timeval tv;
     
-    if (shm_fd==1) 
-        fail("Shared memory segment failed\n");
     
-    ftruncate(shm_fd, sizeof(message));
-    
-    // ******** shm_open() end ***************////// 
-    
-    // ******** mmap() ***************////// 
-    // ******** mmap() – mapping of the memory segment referenced by the file descriptor returned by shm_open() ***************////// 
-    
-    ptr = mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    
-    if (ptr == MAP_FAILED) 
-        fail("Map failed\n");
+    sem_t * sem_id = sem_open(SEM_PATH, O_CREAT, S_IRUSR | S_IWUSR, 1);
+    sem_init(sem_id,0,1);
 
-    /* Write into the memory segment */
-    for (i = 0; i < strlen(*message); ++i) 
+    
+    struct shared_data out_msg,in_msg;
+
+    for(int i=0;i<N_JOINT;i++)
+        out_msg.q[i]=0;
+
+    while(main_loop)
     {
-        sprintf(ptr, "%s", message[i]);
-        ptr += strlen(message[i]);
+    
+        sem_wait(sem_id);
+
+        memcpy(shared_msg, &out_msg, sizeof(struct shared_data));
         
-    }
-    // ******** munmap() ***************////// 
-    // ******** munmap() – unmapping of the memory segment ***************////// 
-    munmap(ptr, SIZE);
+        sem_post(sem_id);
+
+
+        ts.tv_sec = 0;
+        ts.tv_nsec = 500000000; /* 500 ms */
+        clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
+
+        sem_wait(sem_id);
+        
+        memcpy(&in_msg, shared_msg, sizeof(struct shared_data));
+        
+        
+        out_msg=in_msg;
+        
+        for(int i=0;i<N_JOINT;i++)
+            out_msg.q[i]++;
+       
+        sem_post(sem_id);
+        
+
+
+     }
+    
+    shm_unlink(SHMOBJ_PATH);
+
+    sem_close(sem_id);
+    
+    sem_unlink(SEM_PATH);
+    
+    
     return NULL;
 }
 static void *plugin_handler(void *arg)
 {
-    const char * shm_name  = "/AOS";
-    const int SIZE = 4096;
-    int i, shm_fd;
-    void * ptr;
-    char buf[128];
-    
+    struct shared_data in_msg,out_msg;
     struct rtipc_port_label plabel;
     struct sockaddr_ipc saddr;
-    int ret, s, n = 0, len;
+    int ret, s, n = 0;
+    socklen_t addrlen;
     struct timespec ts;
     struct timeval tv;
-    socklen_t addrlen;
     
-    // ******** shm_open() ***************////// 
-    //   shm_open()- opening/creation of a shared memory segment referenced by a name
-    //        1) A special file will appear in the file-system under “/dev/shm/” with the provided name.
-    //        2) The special file represents a POSIX object and it is created for persistence 
-    //        3) ftruncate(...) function resize to memory region to the correct size
+    /****************** SHARED MEMORY ******************* */
     
-    shm_fd = shm_open(shm_name, O_RDONLY, 0666);
-    
-    if (shm_fd==1) 
-        fail("Shared memory segment failed\n");
+    int shared_seg_size = (1 * sizeof(struct shared_data));
+    //int shmfd  = shm_open(SHMOBJ_PATH, O_RDWR, 0666);
+    int shmfd  = shm_open(SHMOBJ_PATH, O_RDWR, S_IRWXU | S_IRWXG);
+    struct shared_data * shared_msg = (struct shared_data *)mmap(NULL, shared_seg_size, PROT_READ | PROT_WRITE, MAP_SHARED,shmfd, 0);
+    sem_t * sem_id = sem_open(SEM_PATH, 0);
+    sem_init(sem_id,0,0);
+    /****************** SHARED MEMORY ******************* */
     
     
-    // ******** mmap() ***************////// 
-    // ******** mmap() – mapping of the memory segment referenced by the file descriptor returned by shm_open() ***************////// 
-    
-    ptr = mmap(0, SIZE, PROT_READ, MAP_SHARED, shm_fd, 0);
-    
-    if (ptr == MAP_FAILED) 
-      fail("Map failed\n");
+    /****************** SOCKECT ******************* */
 
-    /* Read into the memory segment */
-    printf("%s \n ", (char *) ptr);
-    
-    *msg=(char *)ptr;
-    
     s = socket(AF_RTIPC, SOCK_DGRAM, IPCPROTO_XDDP);
-    if (s < 0) {
-            perror("socket");
-            exit(EXIT_FAILURE);
-    }
 
-    /*
-        * Set a port label. This name will be used to find the peer
-        * when connecting, instead of the port number.
-        */
+    if (s < 0) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+    
     strcpy(plabel.label, XDDP_PORT_LABEL);
     ret = setsockopt(s, SOL_XDDP, XDDP_LABEL,
                         &plabel, sizeof(plabel));
     if (ret)
             fail("setsockopt");
+    
+    /*
+    * Set a port label. This name will be used to find the peer
+    * when connecting, instead of the port number.
+    */
+
     memset(&saddr, 0, sizeof(saddr));
     saddr.sipc_family = AF_RTIPC;
     saddr.sipc_port = -1;   /* Tell XDDP to search by label. */
@@ -140,47 +176,73 @@ static void *plugin_handler(void *arg)
             fail("getpeername");
     printf("%s: NRT peer is reading from /dev/rtp%d\n",
             __FUNCTION__, saddr.sipc_port);
-    for (;;) {
-            len = strlen(msg[n]);
-            /*
-                * Send a datagram to the NRT endpoint via the proxy.
-                * We may pass a NULL destination address, since the
-                * socket was successfully assigned the proper default
-                * address via connect(2).
-                */
-            ret = sendto(s, msg[n], len, 0, NULL, 0);
-            if (ret != len)
-                    fail("sendto");
-            printf("%s: sent %d bytes, \"%.*s\"\n",
-                    __FUNCTION__, ret, ret, msg[n]);
-            n = (n + 1) % (sizeof(msg) / sizeof(msg[0]));
-            /*
-                * We run in full real-time mode (i.e. primary mode),
-                * so we have to let the system breathe between two
-                * iterations.
-                */
-            ts.tv_sec = 0;
-            ts.tv_nsec = 500000000; /* 500 ms */
-            clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
-            
-             ret = recvfrom(s, buf, sizeof(buf), 0, NULL, 0);
-             if (ret <= 0)
-                 fail("recvfrom");
-             printf("%s: \"%.*s\" relayed by peer\n", __FUNCTION__, ret, buf);
+    
+    
+    /****************** SOCKECT ******************* */
+    while(main_loop)
+    {
+        
+        /****************** SHARED MEMORY ******************* */
+        sem_wait(sem_id);
+
+        memcpy(&in_msg, shared_msg, sizeof(struct shared_data));
+        
+        sem_post(sem_id);
+
+        /****************** SHARED MEMORY ******************* */
+
+        /****************** SOCKECT ******************* */
+        ret = sendto(s, &in_msg, sizeof(struct shared_data), 0, NULL, 0);
+        if (ret != sizeof(struct shared_data))
+                fail("sendto");
+        /*
+            * We run in full real-time mode (i.e. primary mode),
+            * so we have to let the system breathe between two
+            * iterations.
+            */
+        ts.tv_sec = 0;
+        ts.tv_nsec = 500000000; /* 500 ms */
+        clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
+        
+        ret = recvfrom(s,&in_msg, sizeof(struct shared_data), 0, NULL, 0);
+        if (ret <= 0)
+            fail("recvfrom");
+        
+        printf("%s: \n", __FUNCTION__);
+        for(int i=0;i<N_JOINT;i++)
+            printf("Joint[%d]: %f ",i+1,in_msg.q[i]);
+        printf("\n");
+        /****************** SOCKECT ******************* */
+        
+        out_msg=in_msg;
+        
+        sem_wait(sem_id);
+        
+        memcpy(shared_msg, &out_msg, sizeof(struct shared_data));
+        
+        sem_post(sem_id);
+        
+        ts.tv_sec = 0;
+        ts.tv_nsec = 500000000; /* 500 ms */
+        clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
+ 
+
     }
     
-    //  shm_unlink()
-    //  shm_unlink() – removal of shared memory segment object if nobody is referencing it
-    
-    if (shm_unlink(shm_name) ==1) 
-       fail("Error removing the share memory");
+    if (shm_unlink(SHMOBJ_PATH) ==1) 
+        fail("Error removing the share memory");
+
+    sem_close(sem_id);
+
+    sem_unlink(SEM_PATH);
 
     return NULL;
 }
 
 static void *comm_handler(void *arg)
 {
-        char buf[128], *devname;
+        struct shared_data in_msg;
+        char  *devname;
         int fd, ret;
         if (asprintf(&devname,
                      "/proc/xenomai/registry/rtipc/xddp/%s",
@@ -190,17 +252,23 @@ static void *comm_handler(void *arg)
         free(devname);
         if (fd < 0)
                 fail("open");
-        for (;;) {
+       
+        
+        while(main_loop)
+        {
                 /* Get the next message from realtime_thread2. */
-                ret = read(fd, buf, sizeof(buf));
+                ret = read(fd, &in_msg, sizeof(struct shared_data));
                 if (ret <= 0)
                         fail("read");
-                printf("%s: received %d bytes, \"%.*s\"\n",
-                    __FUNCTION__, ret, ret, buf);
+                
+               for(int i=0;i<N_JOINT;i++)
+                    in_msg.q[i]++;
+               
                 /* Relay the message to realtime_thread1. */
-                ret = write(fd, buf, ret);
+                ret = write(fd, &in_msg, ret);
                 if (ret <= 0)
                       fail("write");
+               
         }
         return NULL;
 }
@@ -212,6 +280,9 @@ int main(int argc, char **argv)
         pthread_attr_t svattr, clattr,regattr;
         sigset_t set;
         int sig;
+        
+        main_common(shutdownSIG);
+        
         sigemptyset(&set);
         sigaddset(&set, SIGINT);
         sigaddset(&set, SIGTERM);

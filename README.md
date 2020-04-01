@@ -4,8 +4,8 @@ Inter Process Communication Mechanism, Real / Non-Real Time, OS Xenomai
 # Useful links
 
 ```
-https://gitlab.denx.de/Xenomai/xenomai/-/wikis/home
-https://xenomai.org/documentation/xenomai-3/html/xeno3prm/index.html
+[https://gitlab.denx.de/Xenomai/xenomai/-/wikis/home](https://gitlab.denx.de/Xenomai/xenomai/-/wikis/home).
+[https://xenomai.org/documentation/xenomai-3/html/xeno3prm/index.html](https://xenomai.org/documentation/xenomai-3/html/xeno3prm/index.html)
 ```
 
 # XENOMAI INSTALLATION

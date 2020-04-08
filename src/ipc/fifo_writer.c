@@ -13,6 +13,7 @@ int main ()
     size_t len = 0;     /* ignored when line = NULL */
     ssize_t read;
     char * myfifo = "/tmp/myfifo";
+    unlink(myfifo);
     if (mkfifo(myfifo, S_IRUSR | S_IWUSR) != 0)
         perror("Cannot create fifo. Already existing?");
     
@@ -24,7 +25,6 @@ int main ()
         exit(1);
         
     }
-
     printf ("Chatting below, digit # to quit\n");
     while (data != '#') 
     {

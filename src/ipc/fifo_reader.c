@@ -19,6 +19,7 @@ int main ()
         unlink(myfifo);exit(1);
         
     }
+    printf("Waiting for characters.....\n");
     while (data != '#') 
     {
         while (read(fd, &data, 1) && (data != '#'))
